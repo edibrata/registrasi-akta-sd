@@ -41,7 +41,7 @@
     }
     #toast-notification.show { opacity: 1; visibility: visible; transform: translateX(-50%) translateY(-10px); }
     
-    .table-wrapper { max-height: 65vh; overflow-y: auto; overflow-x: auto; border-radius: 0.5rem; border: 1px solid #e5e7eb; background: white; }
+    .table-wrapper { flex: 1; min-height: 0; overflow-y: auto; overflow-x: auto; border-radius: 0.5rem; border: 1px solid #e5e7eb; background: white; }
     table { width: 100%; border-collapse: separate; border-spacing: 0; font-size: 0.7rem; }
     
     thead th.main-header { 
@@ -109,7 +109,7 @@
     button:active { transform: translateY(1px); box-shadow: none; }
   </style>
 </head>
-<body class="bg-slate-50 min-h-screen flex justify-center items-start py-4 px-2 sm:py-6 sm:px-4">
+<body class="bg-slate-50 h-[100dvh] overflow-hidden flex justify-center py-4 px-2 sm:py-6 sm:px-4">
   <div id="loading-overlay">
       <svg class="animate-spin text-indigo-600 w-8 h-8 mb-2" viewBox="0 0 24 24">
         <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor"></circle>
@@ -118,7 +118,7 @@
       <span>Menyinkronkan...</span>
   </div>
 
-  <main class="bg-white rounded-2xl shadow-xl w-full max-w-[99vw] p-4 md:p-6 flex flex-col border border-gray-200 transition-all hover:shadow-2xl">
+  <main class="bg-white rounded-2xl shadow-xl w-full max-w-[99vw] p-4 md:p-6 flex flex-col h-full border border-gray-200 transition-all hover:shadow-2xl">
     
     <!-- Header -->
     <div class="flex flex-col lg:flex-row items-center justify-between mb-6 gap-4">
