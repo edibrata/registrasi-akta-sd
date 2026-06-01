@@ -1,0 +1,842 @@
+<!doctype html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Database Registrasi AKTA-SD</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet" />
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+    import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+    import { getFirestore, collection, addDoc, updateDoc, deleteDoc, doc, onSnapshot, query, serverTimestamp, writeBatch, getDocs } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+    const firebaseConfig = {
+      apiKey: "AIzaSyC6IXCk6EXm0ndord8Is6cRZf_mG2MY5UM",
+      authDomain: "kedinasan-d9051.firebaseapp.com",
+      projectId: "kedinasan-d9051",
+      storageBucket: "kedinasan-d9051.firebasestorage.app",
+      messagingSenderId: "488517479224",
+      appId: "1:488517479224:web:57ed244cf69e2a010c6fcd"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const auth = getAuth(app);
+    const db = getFirestore(app);
+    const appId = typeof __app_id !== 'undefined' ? __app_id : 'DataBaseSekolah-App';
+    const collectionName = "DataBaseSekolah";
+
+    window.fbComponents = { auth, db, collection, addDoc, updateDoc, deleteDoc, doc, onSnapshot, query, appId, collectionName, signInWithCustomToken, signInAnonymously, onAuthStateChanged, serverTimestamp, writeBatch, getDocs };
+  </script>
+
+  <style>
+    body { font-family: 'Inter', sans-serif; overflow-x: hidden; }
+    #toast-notification {
+      position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%);
+      padding: 12px 24px; border-radius: 8px; color: white; font-weight: 600;
+      z-index: 6000; opacity: 0; visibility: hidden; transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+      max-width: 90%; text-align: center; box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+    }
+    #toast-notification.show { opacity: 1; visibility: visible; transform: translateX(-50%) translateY(-10px); }
+    
+    .table-wrapper { max-height: 65vh; overflow-y: auto; overflow-x: auto; border-radius: 0.5rem; border: 1px solid #e5e7eb; background: white; }
+    table { width: 100%; border-collapse: separate; border-spacing: 0; font-size: 0.7rem; }
+    
+    thead th.main-header { 
+        position: sticky; top: 0; z-index: 40; background-color: #f9fafb; height: 40px;
+        padding: 0 0.6rem; font-weight: 700; color: #374151; border-bottom: 1px solid #e5e7eb;
+        white-space: nowrap; cursor: pointer; user-select: none; transition: background-color 0.2s;
+    }
+    thead th.main-header:hover { background-color: #e5e7eb; }
+
+    td { padding: 0.6rem; color: #4b5563; border-bottom: 1px solid #f3f4f6; transition: all 0.2s; }
+    tr { transition: all 0.2s; }
+    tr:hover { background-color: #eef2ff; }
+    tr:hover td { color: #1e1b4b; }
+    tr.selected { background-color: #eff6ff; }
+    
+    input[type="text"], select {
+        width: 100%; padding: 0.4rem 0.5rem; border: 1px solid #d1d5db; border-radius: 0.375rem;
+        font-size: 0.75rem; outline: none; transition: all 0.2s; background-color: white;
+    }
+    input[type="text"]:hover, select:hover { border-color: #94a3b8; }
+    
+    #search-input { width: 100%; padding: 0.6rem 1rem 0.6rem 2.75rem; border: 1px solid #d1d5db; border-radius: 0.75rem; font-size: 0.8rem; outline: none; transition: all 0.2s; background-color: #f8fafc; }
+    #filter-status { width: 100%; padding: 0.6rem 2rem 0.6rem 1rem; border: 1px solid #d1d5db; border-radius: 0.75rem; font-size: 0.8rem; outline: none; transition: all 0.2s; background-color: #f8fafc; cursor: pointer; color: #475569; font-weight: 600; appearance: none; background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%236b7280' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3e%3c/svg%3e"); background-position: right 0.5rem center; background-repeat: no-repeat; background-size: 1.5em 1.5em; }
+    
+    input[type="text"]:focus, #search-input:focus, #filter-status:focus, select:focus { border-color: #6366f1; box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.15); transform: translateY(-1px); background-color: white; }
+    #search-input:hover, #filter-status:hover { background-color: white; border-color: #cbd5e1; }
+
+    mark { background-color: #fef08a; color: #1e1b4b; padding: 0 1px; border-radius: 2px; font-weight: 700; }
+
+    .modal-overlay {
+        position: fixed; inset: 0; background: rgba(15, 23, 42, 0.6); display: flex; align-items: center; justify-content: center;
+        z-index: 4000; opacity: 0; visibility: hidden; transition: all 0.3s ease; backdrop-filter: blur(4px);
+    }
+    .modal-overlay.active { opacity: 1; visibility: visible; }
+    .modal-content { background: white; width: 95%; max-width: 700px; border-radius: 1rem; padding: 1.5rem; transform: scale(0.95) translateY(10px); transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25); }
+    .modal-overlay.active .modal-content { transform: scale(1) translateY(0); }
+
+    #loading-overlay { position: fixed; inset: 0; background: rgba(255,255,255,0.9); display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 9999; font-weight: bold; color: #4f46e5; backdrop-filter: blur(8px); }
+
+    .tooltip-container { position: relative; display: inline-block; }
+    .tooltip-text {
+        visibility: hidden; width: max-content; background-color: #1e293b; color: #fff; text-align: center; border-radius: 6px; padding: 6px 12px;
+        position: absolute; z-index: 100; bottom: 130%; left: 50%; transform: translateX(-50%) translateY(10px); opacity: 0; transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1); font-size: 10px; pointer-events: none; white-space: nowrap; box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1); font-weight: 600; letter-spacing: 0.025em;
+    }
+    .tooltip-container:hover .tooltip-text { visibility: visible; opacity: 1; transform: translateX(-50%) translateY(0); }
+
+    .icon-btn { width: 38px; height: 38px; display: flex; align-items: center; justify-content: center; border-radius: 10px; transition: all 0.2s; position: relative; overflow: hidden; }
+    .icon-btn::after { content: ''; position: absolute; inset: 0; background: white; opacity: 0; transition: opacity 0.2s; }
+    .icon-btn:hover::after { opacity: 0.15; }
+    .icon-btn:active { transform: scale(0.92); }
+    
+    svg { stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; fill: none; width: 18px; height: 18px; transition: stroke 0.2s; }
+    .icon-btn:hover svg { transform: scale(1.1); transition: transform 0.2s cubic-bezier(0.4, 0, 0.2, 1); }
+
+    input[type="checkbox"] { width: 14px; height: 14px; cursor: pointer; accent-color: #4f46e5; transition: transform 0.1s; }
+    input[type="checkbox"]:hover { transform: scale(1.1); }
+    input[type="checkbox"]:active { transform: scale(0.9); }
+
+    .animate-fade-in { animation: fadeIn 0.3s cubic-bezier(0.4, 0, 0.2, 1); }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(-10px); } to { opacity: 1; transform: translateY(0); } }
+    
+    /* Tombol Aksi */
+    button { transition: all 0.2s; }
+    button:hover { transform: translateY(-1px); box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1); }
+    button:active { transform: translateY(1px); box-shadow: none; }
+  </style>
+</head>
+<body class="bg-slate-50 min-h-screen flex justify-center items-start py-4 px-2 sm:py-6 sm:px-4">
+  <div id="loading-overlay">
+      <svg class="animate-spin text-indigo-600 w-8 h-8 mb-2" viewBox="0 0 24 24">
+        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor"></circle>
+        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+      </svg>
+      <span>Menyinkronkan...</span>
+  </div>
+
+  <main class="bg-white rounded-2xl shadow-xl w-full max-w-[99vw] p-4 md:p-6 mb-8 flex flex-col border border-gray-200 transition-all hover:shadow-2xl">
+    
+    <!-- Header -->
+    <div class="flex flex-col lg:flex-row items-center justify-between mb-6 gap-4">
+      <div class="flex items-center gap-4 group">
+        <div class="relative bg-gradient-to-b from-indigo-600 via-indigo-700 to-slate-800 text-white rounded-xl p-3 shadow-[0_8px_20px_-6px_rgba(67,56,202,0.5)] ring-1 ring-inset ring-white/20 group-hover:scale-[1.02] group-hover:shadow-[0_12px_24px_-8px_rgba(67,56,202,0.7)] transition-all duration-300 overflow-hidden shrink-0">
+          <div class="absolute inset-0 bg-gradient-to-tr from-transparent via-white/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" class="w-6 h-6 relative z-10 drop-shadow-sm" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+            <polygon points="12 2 2 7 12 12 22 7 12 2"></polygon>
+            <polyline points="2 17 12 22 22 17"></polyline>
+            <polyline points="2 12 12 17 22 12"></polyline>
+          </svg>
+        </div>
+        <div>
+          <h1 class="font-bold tracking-tight text-slate-800 text-lg md:text-xl leading-tight group-hover:text-indigo-700 transition-colors">Registrasi AKTA-SD</h1>
+          <div class="flex items-center gap-2 mt-0.5">
+              <span id="sync-status" class="bg-orange-100 text-orange-600 text-[9px] font-black px-1.5 py-0.5 rounded uppercase transition-colors">Menghubungkan</span>
+              <p class="text-slate-400 text-xs font-medium">Cloud Storage Mode</p>
+          </div>
+        </div>
+      </div>
+      
+      <div class="flex flex-wrap items-center gap-2 w-full lg:w-auto justify-between lg:justify-end mt-4 lg:mt-0">
+          <div class="flex gap-2 w-full md:w-auto lg:mr-2">
+              <div class="relative w-full md:w-56 group">
+                  <div class="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-indigo-500 transition-colors">
+                    <svg viewBox="0 0 24 24" stroke="currentColor" class="w-4 h-4">
+                      <circle cx="11" cy="11" r="8"></circle>
+                      <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+                    </svg>
+                  </div>
+                  <input type="search" id="search-input" placeholder="Cari Data..." class="shadow-sm placeholder:text-slate-400">
+              </div>
+              <div class="w-full md:w-40 relative group">
+                  <select id="filter-status" class="shadow-sm">
+                    <option value="all">Semua Status</option>
+                    <option value="valid">Data Valid</option>
+                    <option value="draft">Hanya Draft</option>
+                  </select>
+              </div>
+          </div>
+
+          <div class="flex gap-1.5 items-center">
+              <div class="tooltip-container">
+                  <button id="add-school-btn" class="icon-btn bg-gradient-to-br from-indigo-600 to-indigo-700 text-white shadow-md mr-1 border border-indigo-500 hover:shadow-indigo-300">
+                    <svg viewBox="0 0 24 24" stroke="currentColor"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+                  </button>
+                  <span class="tooltip-text">Tambah Data Sekolah</span>
+              </div>
+
+              <div class="tooltip-container">
+                  <button id="download-template-btn" class="icon-btn bg-emerald-50 text-emerald-600 border border-emerald-200">
+                    <svg viewBox="0 0 24 24" stroke="currentColor"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="12" y1="18" x2="12" y2="12"></line><line x1="9" y1="15" x2="15" y2="15"></line></svg>
+                  </button>
+                  <span class="tooltip-text">Download Template Excel</span>
+              </div>
+
+              <div class="tooltip-container">
+                  <button id="export-excel-btn" class="icon-btn bg-gradient-to-br from-emerald-600 to-emerald-700 text-white shadow-sm border border-emerald-500">
+                    <svg viewBox="0 0 24 24" stroke="currentColor"><path d="M12 15V3"></path><path d="m8 7 4-4 4 4"></path><path d="M5 20h14"></path></svg>
+                  </button>
+                  <span class="tooltip-text">Ekspor ke Excel</span>
+              </div>
+
+              <div class="tooltip-container">
+                  <button id="import-excel-btn" class="icon-btn bg-gradient-to-br from-teal-500 to-teal-600 text-white shadow-sm border border-teal-400">
+                    <svg viewBox="0 0 24 24" stroke="currentColor"><path d="M12 3v12"></path><path d="m8 11 4 4 4-4"></path><path d="M5 20h14"></path></svg>
+                  </button>
+                  <span class="tooltip-text">Impor dari Excel</span>
+              </div>
+              <input type="file" id="excel-file-input" class="hidden" accept=".xlsx, .xls">
+              
+              <div class="h-6 w-px bg-slate-200 mx-1"></div>
+
+              <div class="tooltip-container">
+                  <button id="backup-btn" class="icon-btn bg-gradient-to-br from-slate-700 to-slate-800 text-white shadow-sm border border-slate-600">
+                    <svg viewBox="0 0 24 24" stroke="currentColor"><path d="M4.393 15.269A7 7 0 1 1 15.71 8h1.79a4.5 4.5 0 0 1 2.436 8.284"></path><path d="M12 13v8"></path><path d="m8 17 4 4 4-4"></path></svg>
+                  </button>
+                  <span class="tooltip-text">Backup Cloud (JSON)</span>
+              </div>
+              
+              <div class="tooltip-container">
+                  <button id="restore-btn" class="icon-btn bg-slate-50 text-slate-700 border border-slate-300">
+                    <svg viewBox="0 0 24 24" stroke="currentColor"><path d="M4.393 15.269A7 7 0 1 1 15.71 8h1.79a4.5 4.5 0 0 1 2.436 8.284"></path><path d="M12 12v9"></path><path d="m16 16-4-4-4 4"></path></svg>
+                  </button>
+                  <span class="tooltip-text">Restore Cloud (JSON)</span>
+              </div>
+              <input type="file" id="json-file-input" class="hidden" accept=".json">
+
+              <div id="delete-actions-group" class="hidden flex items-center animate-fade-in group">
+                  <div class="h-6 w-px bg-slate-200 mx-1"></div>
+                  <div class="tooltip-container">
+                      <button id="delete-selected-btn" class="icon-btn bg-gradient-to-br from-red-500 to-red-600 text-white shadow-md border border-red-500 hover:shadow-red-300">
+                        <svg viewBox="0 0 24 24" stroke="currentColor"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path><line x1="10" y1="11" x2="10" y2="17"></line><line x1="14" y1="11" x2="14" y2="17"></line></svg>
+                      </button>
+                      <span class="tooltip-text">Hapus Data Terpilih</span>
+                  </div>
+              </div>
+          </div>
+      </div>
+    </div>
+
+    <!-- Wadah Tabel -->
+    <div class="table-wrapper shadow-sm ring-1 ring-slate-200">
+      <table id="main-table">
+        <thead class="bg-slate-50/80 backdrop-blur-sm">
+          <tr>
+            <th width="30" class="main-header text-center"><input type="checkbox" id="select-all-checkbox"></th>
+            <th width="40" class="main-header text-center" data-sort="id">NO</th>
+            <th width="100" class="main-header text-center" data-sort="timestamp">TIMESTAMP</th>
+            <th class="main-header" data-sort="nama-sekolah">NAMA SEKOLAH</th>
+            <th width="100" class="main-header text-center" data-sort="npsn">NPSN</th>
+            <th class="main-header" data-sort="alamat">ALAMAT LENGKAP</th>
+            <th width="110" class="main-header text-center" data-sort="desa-kelurahan-jenis">JENIS WILAYAH</th>
+            <th class="main-header" data-sort="desa-kelurahan-nama">NAMA DESA/KEL.</th>
+            <th class="main-header" data-sort="kecamatan">KECAMATAN</th>
+            <th width="110" class="main-header text-center" data-sort="kabupaten-kota-jenis">TIPE DAERAH</th>
+            <th class="main-header" data-sort="kabupaten-kota-nama">NAMA KAB./KOTA</th>
+            <th class="main-header" data-sort="provinsi">PROVINSI</th>
+          </tr>
+        </thead>
+        <tbody id="table-body">
+          <!-- Data Rows -->
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Footer -->
+    <div class="mt-4 flex flex-col md:flex-row flex-wrap items-center justify-between text-[10px] text-slate-500 gap-4">
+        <div class="flex items-center gap-3">
+            <div class="flex items-center gap-1"><span class="w-2 h-2 bg-indigo-500 rounded-full animate-pulse"></span><span>Klik Nama Sekolah untuk Edit • <span id="selection-summary">0 dipilih</span></span></div>
+        </div>
+        <div class="flex flex-wrap justify-center md:justify-end gap-2 items-center">
+            <div class="bg-white px-3 py-1.5 rounded-lg border border-slate-200 font-medium tracking-tight shadow-sm flex items-center gap-2">
+                <span class="text-slate-400">Data Valid:</span> <span id="stat-total" class="font-black text-slate-700 text-[12px] tracking-normal">0</span>
+            </div>
+            <div class="bg-emerald-50 px-3 py-1.5 rounded-lg border border-emerald-100 font-medium tracking-tight shadow-sm flex items-center gap-2">
+                <span class="text-emerald-600">Hari Ini:</span> <span id="stat-today" class="font-black text-emerald-700 text-[12px] tracking-normal">0</span>
+            </div>
+            <div class="bg-amber-50 px-3 py-1.5 rounded-lg border border-amber-100 font-medium tracking-tight shadow-sm flex items-center gap-2">
+                <span class="text-amber-600">Draft:</span> <span id="stat-draft" class="font-black text-amber-700 text-[12px] tracking-normal">0</span>
+            </div>
+            <div class="bg-slate-100 px-3 py-1.5 rounded-lg border border-slate-200 font-medium tracking-tight shadow-sm flex items-center gap-2">
+                <span class="text-slate-500">Total Database:</span> <span id="school-count" class="font-black text-indigo-700 text-[12px] tracking-normal">0</span>
+            </div>
+        </div>
+    </div>
+  </main>
+
+  <!-- Modal Edit / Tambah -->
+  <div id="action-modal" class="modal-overlay">
+    <div class="modal-content shadow-2xl border border-slate-200">
+      <div class="flex justify-between items-center mb-6 border-b border-slate-100 pb-4">
+        <div class="flex items-center gap-3">
+            <div id="modal-icon-bg" class="w-10 h-10 bg-indigo-600 text-white rounded-xl flex items-center justify-center shadow-lg transition-colors">
+                <svg id="modal-icon" viewBox="0 0 24 24" stroke="currentColor"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
+            </div>
+            <div>
+                <div class="flex items-center gap-2">
+                    <h2 id="modal-title" class="text-lg font-bold text-slate-800">Edit Profil Sekolah</h2>
+                    <span id="audit-trail" class="hidden text-[9px] font-medium text-slate-400 bg-slate-100 px-1.5 py-0.5 rounded border border-slate-200 shadow-sm">Terakhir Dimodifikasi: -</span>
+                </div>
+                <p id="modal-subtitle" class="text-[10px] text-slate-400 font-bold uppercase tracking-wider mt-0.5">Cloud ID: <span id="display-id" class="font-mono text-slate-500">-</span></p>
+            </div>
+        </div>
+        <button id="close-modal-btn" class="text-slate-400 hover:text-rose-500 bg-white hover:bg-rose-50 p-1.5 rounded-lg border border-transparent hover:border-rose-100 transition-all">
+            <svg viewBox="0 0 24 24" stroke="currentColor"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+        </button>
+      </div>
+
+      <input type="hidden" id="edit-id">
+      
+      <div class="space-y-4 mb-8 text-[11.5px]">
+        <div class="flex flex-col sm:flex-row gap-4">
+            <div class="flex-grow group">
+              <label class="block font-bold text-slate-500 mb-1.5 uppercase tracking-tight group-focus-within:text-indigo-600 transition-colors">Nama Satuan Pendidikan</label>
+              <input type="text" id="edit-nama-sekolah" class="font-bold text-indigo-700 bg-indigo-50/50 text-[13px] py-2.5 px-3 w-full border-indigo-100 focus:border-indigo-400" placeholder="Contoh: SDN Nusantara">
+            </div>
+            <div class="w-full sm:w-40 group relative">
+              <label class="block font-bold text-slate-500 mb-1.5 uppercase tracking-tight group-focus-within:text-indigo-600 transition-colors">NPSN</label>
+              <input type="text" id="edit-npsn" class="py-2.5 px-3 w-full" placeholder="8 Digit Angka" maxlength="8" pattern="[0-9]*" oninput="this.value=this.value.replace(/[^0-9]/g, ''); if(this.value.length < 8 && this.value.length > 0) { this.classList.add('border-rose-400','focus:border-rose-500', 'bg-rose-50'); document.getElementById('npsn-err').classList.remove('hidden'); } else { this.classList.remove('border-rose-400','focus:border-rose-500', 'bg-rose-50'); document.getElementById('npsn-err').classList.add('hidden'); }">
+              <p id="npsn-err" class="hidden text-rose-500 text-[9.5px] mt-1 absolute -bottom-4.5 left-0 font-bold tracking-tight">Harus 8 digit angka.</p>
+            </div>
+        </div>
+        
+        <div class="w-full group">
+          <label class="block font-bold text-slate-500 mb-1.5 uppercase tracking-tight group-focus-within:text-indigo-600 transition-colors">Alamat Lengkap</label>
+          <input type="text" id="edit-alamat" class="py-2.5 px-3 w-full" placeholder="Jl. Pendidikan No. 1, RT/RW...">
+        </div>
+
+        <div class="flex flex-col sm:flex-row gap-4">
+          <div class="w-full sm:w-28 group">
+            <label class="block font-bold text-slate-500 mb-1.5 uppercase tracking-tight group-focus-within:text-indigo-600 transition-colors">Jenis Desa/Kel</label>
+            <select id="edit-desa-kelurahan-jenis" class="py-2.5 px-3 w-full">
+                <option value="">Pilih</option>
+                <option value="Desa">Desa</option>
+                <option value="Kelurahan">Kelurahan</option>
+            </select>
+          </div>
+          <div class="flex-grow group">
+            <label class="block font-bold text-slate-500 mb-1.5 uppercase tracking-tight group-focus-within:text-indigo-600 transition-colors">Nama Desa/Kelurahan</label>
+            <input type="text" id="edit-desa-kelurahan-nama" class="py-2.5 px-3 w-full" placeholder="Nama Desa atau Kelurahan">
+          </div>
+          <div class="flex-grow group">
+            <label class="block font-bold text-slate-500 mb-1.5 uppercase tracking-tight group-focus-within:text-indigo-600 transition-colors">Kecamatan</label>
+            <input type="text" id="edit-kecamatan" class="py-2.5 px-3 w-full" placeholder="Nama Kecamatan">
+          </div>
+        </div>
+
+        <div class="flex flex-col sm:flex-row gap-4">
+          <div class="w-full sm:w-28 group">
+            <label class="block font-bold text-slate-500 mb-1.5 uppercase tracking-tight group-focus-within:text-indigo-600 transition-colors">Jenis Kab/Kota</label>
+            <select id="edit-kabupaten-kota-jenis" class="py-2.5 px-3 w-full">
+                <option value="">Pilih</option>
+                <option value="Kabupaten">Kabupaten</option>
+                <option value="Kota">Kota</option>
+            </select>
+          </div>
+          <div class="flex-grow group">
+            <label class="block font-bold text-slate-500 mb-1.5 uppercase tracking-tight group-focus-within:text-indigo-600 transition-colors">Nama Kabupaten/Kota</label>
+            <input type="text" id="edit-kabupaten-kota-nama" class="py-2.5 px-3 w-full" placeholder="Nama Kabupaten atau Kota">
+          </div>
+          <div class="flex-grow group">
+            <label class="block font-bold text-slate-500 mb-1.5 uppercase tracking-tight group-focus-within:text-indigo-600 transition-colors">Provinsi</label>
+            <input type="text" id="edit-provinsi" class="py-2.5 px-3 w-full" placeholder="Nama Provinsi">
+          </div>
+        </div>
+      </div>
+
+      <div class="flex flex-col-reverse sm:flex-row gap-4 items-center justify-between pt-5 border-t border-slate-100">
+        <div id="edit-only-actions" class="flex gap-2 w-full sm:w-auto justify-center sm:justify-start">
+            <button id="delete-btn" class="text-rose-500 hover:text-white text-[11px] font-bold flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg hover:bg-rose-500 border border-transparent hover:border-rose-600 transition-colors flex-1 sm:flex-none">
+              <svg viewBox="0 0 24 24" stroke="currentColor" class="w-3.5 h-3.5"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path><line x1="10" y1="11" x2="10" y2="17"></line><line x1="14" y1="11" x2="14" y2="17"></line></svg>
+              HAPUS
+            </button>
+            <button id="duplicate-btn" class="text-indigo-600 hover:text-white text-[11px] font-bold flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg hover:bg-indigo-600 border border-transparent hover:border-indigo-700 transition-colors flex-1 sm:flex-none">
+              <svg viewBox="0 0 24 24" stroke="currentColor" class="w-3.5 h-3.5"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1-2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+              DUPLIKAT
+            </button>
+        </div>
+        <div class="flex flex-wrap gap-2 w-full sm:w-auto justify-center sm:justify-end">
+            <button id="modal-cancel-btn" class="text-slate-500 text-[11px] font-bold px-4 py-2.5 rounded-lg hover:bg-slate-100 border border-transparent hover:border-slate-200 transition-all flex-1 sm:flex-none">BATAL</button>
+            
+            <button id="save-draft-btn" class="border border-amber-200 text-amber-600 bg-amber-50/50 hover:bg-amber-100 hover:border-amber-300 text-[11px] font-bold px-4 py-2.5 rounded-lg transition-all shadow-sm hidden flex-1 sm:flex-none">DRAFT</button>
+            
+            <button id="save-add-more-btn" class="hidden border border-indigo-200 text-indigo-600 bg-indigo-50/50 hover:bg-indigo-100 hover:border-indigo-300 text-[11px] font-bold px-4 py-2.5 rounded-lg transition-all shadow-sm flex-1 sm:flex-none whitespace-nowrap">SIMPAN & TAMBAH</button>
+            
+            <button id="save-main-btn" class="bg-gradient-to-r from-indigo-600 to-indigo-700 hover:from-indigo-700 hover:to-indigo-800 text-white text-[11px] font-bold px-6 py-2.5 rounded-lg shadow-lg active:scale-95 border border-indigo-700 transition-all flex-1 sm:flex-none">SIMPAN</button>
+        </div>
+      </div>
+    </div>
+  </div>
+  
+  <div id="toast-notification"></div>
+
+  <script>
+    const checkFB = setInterval(() => {
+        if (window.fbComponents) {
+            clearInterval(checkFB);
+            initApp();
+        }
+    }, 100);
+
+    async function initApp() {
+        const { auth, db, collection, addDoc, updateDoc, deleteDoc, doc, onSnapshot, query, appId, collectionName, signInWithCustomToken, signInAnonymously, onAuthStateChanged, serverTimestamp, writeBatch, getDocs } = window.fbComponents;
+
+        let allData = [];
+        let drafts = JSON.parse(localStorage.getItem('akta-sd-drafts') || "[]");
+        let displayedData = [];
+        let selectedIds = new Set();
+        let sortConfig = { key: null, direction: null };
+        let isEditMode = false;
+
+        const fieldIds = ["nama-sekolah", "npsn", "alamat", "desa-kelurahan-jenis", "desa-kelurahan-nama", "kecamatan", "kabupaten-kota-jenis", "kabupaten-kota-nama", "provinsi"];
+
+        const excelColumns = [
+            { id: "timestamp", label: "Timestamp" },
+            { id: "nama-sekolah", label: "Nama Sekolah" },
+            { id: "npsn", label: "NPSN" },
+            { id: "alamat", label: "Alamat Lengkap" },
+            { id: "desa-kelurahan-jenis", label: "Jenis Desa/Kel" },
+            { id: "desa-kelurahan-nama", label: "Nama Desa/Kel" },
+            { id: "kecamatan", label: "Kecamatan" },
+            { id: "kabupaten-kota-jenis", label: "Jenis Kab/Kota" },
+            { id: "kabupaten-kota-nama", label: "Nama Kab/Kota" },
+            { id: "provinsi", label: "Provinsi" }
+        ];
+
+        const toast = document.getElementById('toast-notification');
+        function showToast(message, isSuccess = true) {
+            toast.innerHTML = message;
+            toast.className = 'show ' + (isSuccess ? 'bg-emerald-600' : 'bg-rose-600');
+            setTimeout(() => toast.classList.remove('show'), 3000);
+        }
+
+        function getTimestamp() {
+            const now = new Date();
+            const Y = now.getFullYear(); const M = String(now.getMonth()+1).padStart(2,'0'); const D = String(now.getDate()).padStart(2,'0');
+            const h = String(now.getHours()).padStart(2,'0'); const m = String(now.getMinutes()).padStart(2,'0'); const s = String(now.getSeconds()).padStart(2,'0');
+            return `${Y}${M}${D} ${h}.${m}.${s}`;
+        }
+
+        function formatDisplayDate(ts) {
+            if (!ts) return "-";
+            const d = new Date(ts);
+            return `${String(d.getDate()).padStart(2,'0')}/${String(d.getMonth()+1).padStart(2,'0')}/${d.getFullYear().toString().slice(-2)} ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;
+        }
+
+        function highlightText(text, search) {
+            if (!search || !text) return text;
+            const searchTerms = search.trim().split(/\s+/);
+            let highlighted = String(text);
+            searchTerms.forEach(term => {
+                if (term.length < 1) return;
+                const regex = new RegExp(`(${term.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})`, 'gi');
+                highlighted = highlighted.replace(regex, '<mark>$1</mark>');
+            });
+            return highlighted;
+        }
+
+        function updateSelectionUI() {
+            const deleteGroup = document.getElementById('delete-actions-group');
+            const summarySpan = document.getElementById('selection-summary');
+            const selectAllCheck = document.getElementById('select-all-checkbox');
+            
+            if (selectedIds.size > 0) {
+                deleteGroup.classList.remove('hidden');
+                summarySpan.textContent = `${selectedIds.size} dipilih`;
+                summarySpan.classList.add('font-bold', 'text-indigo-600');
+            } else {
+                deleteGroup.classList.add('hidden');
+                summarySpan.textContent = `0 dipilih`;
+                summarySpan.classList.remove('font-bold', 'text-indigo-600');
+            }
+
+            if (displayedData.length > 0 && displayedData.every(item => selectedIds.has(item.id))) {
+                selectAllCheck.checked = true; selectAllCheck.indeterminate = false;
+            } else if (displayedData.some(item => selectedIds.has(item.id))) {
+                selectAllCheck.checked = false; selectAllCheck.indeterminate = true;
+            } else {
+                selectAllCheck.checked = false; selectAllCheck.indeterminate = false;
+            }
+        }
+
+        document.getElementById('select-all-checkbox').addEventListener('change', (e) => {
+            if (e.target.checked) displayedData.forEach(item => selectedIds.add(item.id));
+            else displayedData.forEach(item => selectedIds.delete(item.id));
+            renderTable(displayedData); updateSelectionUI();
+        });
+
+        window.toggleRowSelection = (id) => {
+            if (selectedIds.has(id)) selectedIds.delete(id); else selectedIds.add(id);
+            renderTable(displayedData); updateSelectionUI();
+        };
+
+        try {
+            if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+                try { await signInWithCustomToken(auth, __initial_auth_token); } catch (err) { await signInAnonymously(auth); }
+            } else { await signInAnonymously(auth); }
+        } catch (e) { showToast("Gagal koneksi cloud.", false); }
+
+        onAuthStateChanged(auth, (user) => {
+            const status = document.getElementById('sync-status');
+            const overlay = document.getElementById('loading-overlay');
+            if (user) {
+                status.textContent = "Sinkronisasi Aktif";
+                status.className = "bg-emerald-100 text-emerald-600 text-[9px] font-black px-1.5 py-0.5 rounded uppercase transition-colors";
+                overlay.style.display = 'none';
+                startListening(user);
+            } else {
+                status.textContent = "Luring";
+                status.className = "bg-rose-100 text-rose-600 text-[9px] font-black px-1.5 py-0.5 rounded uppercase transition-colors";
+            }
+        });
+
+        function startListening(user) {
+            if (!user) return;
+            const q = query(collection(db, 'artifacts', appId, 'public', 'data', collectionName));
+            onSnapshot(q, (snapshot) => {
+                allData = snapshot.docs.map(doc => {
+                    const data = doc.data();
+                    return { id: doc.id, ...data, timestamp: data.timestamp?.toMillis ? data.timestamp.toMillis() : (data.timestamp || 0) };
+                });
+                const currentDocIds = new Set([...allData.map(d => d.id), ...drafts.map(d=>d.id)]);
+                selectedIds.forEach(id => { if(!currentDocIds.has(id)) selectedIds.delete(id); });
+                
+                refreshFilterAndRender();
+            });
+        }
+
+        function applySortAndRender(filteredData = null) {
+            let dataToDisplay = filteredData || [...drafts, ...allData];
+            if (sortConfig.key && sortConfig.direction) {
+                dataToDisplay.sort((a, b) => {
+                    let vA = a[sortConfig.key] || ''; let vB = b[sortConfig.key] || '';
+                    if (typeof vA === 'string') vA = vA.toLowerCase(); if (typeof vB === 'string') vB = vB.toLowerCase();
+                    if (vA < vB) return sortConfig.direction === 'asc' ? -1 : 1;
+                    if (vA > vB) return sortConfig.direction === 'asc' ? 1 : -1;
+                    return 0;
+                });
+            }
+            displayedData = dataToDisplay;
+            renderTable(dataToDisplay); updateSelectionUI();
+        }
+
+        function renderTable(dataToDisplay) {
+            const tableBody = document.getElementById('table-body');
+            const schoolCount = document.getElementById('school-count');
+            tableBody.innerHTML = ''; schoolCount.textContent = dataToDisplay.length;
+            
+            const validCount = allData.length;
+            const todayCount = allData.filter(item => { if(!item.timestamp) return false; const d = new Date(item.timestamp); const now = new Date(); return d.getDate() === now.getDate() && d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear(); }).length;
+            
+            const statTotal = document.getElementById('stat-total'); if(statTotal) statTotal.textContent = validCount;
+            const statToday = document.getElementById('stat-today'); if(statToday) statToday.textContent = todayCount;
+            const statDraft = document.getElementById('stat-draft'); if(statDraft) statDraft.textContent = drafts.length;
+
+            const searchVal = document.getElementById('search-input').value;
+
+            if (dataToDisplay.length === 0) {
+                tableBody.innerHTML = `<tr><td colspan="12" class="text-center py-16 bg-slate-50 border-t border-slate-100">
+                    <div class="flex flex-col items-center justify-center opacity-75">
+                        <svg viewBox="0 0 24 24" stroke="currentColor" class="w-12 h-12 text-slate-300 mb-3"><path d="M4 22h14a2 2 0 0 0 2-2V7.5L14.5 2H6a2 2 0 0 0-2 2v4"></path><polyline points="14 2 14 8 20 8"></polyline><path d="M2 15h10M2 18h10M2 12h10"></path></svg>
+                        <h3 class="text-slate-500 font-bold mb-1 text-[13px]">Belum Ada Data</h3>
+                        <p class="text-slate-400 text-[10px]">Klik tombol <span class="font-bold text-indigo-500">Tambah</span> untuk memulai registrasi baru.</p>
+                    </div>
+                </td></tr>`;
+            } else {
+                dataToDisplay.forEach((item, index) => {
+                    const isSelected = selectedIds.has(item.id);
+                    const row = document.createElement('tr');
+                    if (isSelected) row.classList.add('selected');
+                    
+                    row.innerHTML = `
+                        <td class="text-center"><input type="checkbox" ${isSelected ? 'checked' : ''} onchange="toggleRowSelection('${item.id}')"></td>
+                        <td class="text-center font-bold text-slate-400 border-r border-slate-100">${index + 1}</td>
+                        <td class="text-[9.5px] text-slate-400 font-mono text-center">
+                            ${item.isDraft ? '<span class="bg-amber-100 border border-amber-200 text-amber-600 px-1.5 py-0.5 rounded shadow-sm font-bold tracking-tight">DRAFT</span>' : formatDisplayDate(item.timestamp)}
+                        </td>
+                        <td class="font-bold text-indigo-700 cursor-pointer transition-all hover:underline hover:text-indigo-900 underline-offset-4 decoration-indigo-300 decoration-2">${highlightText(item['nama-sekolah'], searchVal)}</td>
+                        <td class="font-mono text-slate-500 text-center">${highlightText(item['npsn'], searchVal)}</td>
+                        <td class="max-w-[150px] truncate" title="${item['alamat']}">${highlightText(item['alamat'], searchVal)}</td>
+                        <td class="text-[10px] text-slate-500 capitalize text-center">${highlightText(item['desa-kelurahan-jenis'], searchVal) || '-'}</td>
+                        <td>${highlightText(item['desa-kelurahan-nama'], searchVal)}</td>
+                        <td>${highlightText(item['kecamatan'], searchVal)}</td>
+                        <td class="text-[10px] text-slate-500 capitalize text-center">${highlightText(item['kabupaten-kota-jenis'], searchVal) || '-'}</td>
+                        <td>${highlightText(item['kabupaten-kota-nama'], searchVal)}</td>
+                        <td>${highlightText(item['provinsi'], searchVal)}</td>
+                    `;
+                    row.querySelector('td:nth-child(4)').onclick = () => openActionModal(item.id);
+                    tableBody.appendChild(row);
+                });
+            }
+        }
+
+        document.querySelectorAll('thead th.main-header').forEach(th => {
+            th.onclick = (e) => {
+                if (e.target.tagName === 'INPUT') return;
+                const key = th.getAttribute('data-sort'); if (!key) return;
+                if (sortConfig.key === key) {
+                    sortConfig.direction = sortConfig.direction === 'asc' ? 'desc' : (sortConfig.direction === 'desc' ? null : 'asc');
+                    if (!sortConfig.direction) sortConfig.key = null;
+                } else { sortConfig.key = key; sortConfig.direction = 'asc'; }
+                refreshFilterAndRender();
+            };
+        });
+
+        window.openActionModal = (id = null) => {
+            const modal = document.getElementById('action-modal');
+            const title = document.getElementById('modal-title');
+            const subtitle = document.getElementById('modal-subtitle');
+            const iconBg = document.getElementById('modal-icon-bg');
+            const editActions = document.getElementById('edit-only-actions');
+            const addMoreBtn = document.getElementById('save-add-more-btn');
+            const draftBtn = document.getElementById('save-draft-btn');
+            const mainBtn = document.getElementById('save-main-btn');
+            const displayId = document.getElementById('display-id');
+            const editIdInput = document.getElementById('edit-id');
+
+            fieldIds.forEach(fid => { const el = document.getElementById(`edit-${fid}`); if (el) el.value = ''; });
+
+            if (id) {
+                isEditMode = true;
+                const item = [...drafts, ...allData].find(d => d.id === id);
+                if (!item) return;
+                title.textContent = item.isDraft ? "Edit Draft Sekolah" : "Edit Profil Sekolah";
+                subtitle.classList.remove('hidden'); displayId.textContent = item.id; editIdInput.value = item.id;
+                document.getElementById('audit-trail').classList.remove('hidden');
+                document.getElementById('audit-trail').textContent = "Pembaruan Terakhir: " + formatDisplayDate(item.timestamp);
+                iconBg.className = "w-10 h-10 bg-indigo-600 text-white rounded-xl flex items-center justify-center shadow-lg transition-colors";
+                editActions.classList.remove('hidden'); addMoreBtn.classList.add('hidden');
+                
+                if(item.isDraft) {
+                    draftBtn.classList.remove('hidden');
+                    mainBtn.textContent = "KIRIM KE DATABASE";
+                } else {
+                    draftBtn.classList.add('hidden');
+                    mainBtn.textContent = "SIMPAN PERUBAHAN";
+                }
+
+                fieldIds.forEach(fid => { const el = document.getElementById(`edit-${fid}`); if (el) el.value = item[fid] || ''; });
+            } else {
+                isEditMode = false;
+                title.textContent = "Registrasi Sekolah Baru";
+                subtitle.classList.add('hidden'); editIdInput.value = "";
+                document.getElementById('audit-trail').classList.add('hidden');
+                iconBg.className = "w-10 h-10 bg-emerald-500 text-white rounded-xl flex items-center justify-center shadow-lg shadow-emerald-500/30 transition-colors";
+                editActions.classList.add('hidden'); addMoreBtn.classList.remove('hidden');
+                draftBtn.classList.remove('hidden');
+                mainBtn.textContent = "SIMPAN";
+            }
+            modal.classList.add('active');
+        };
+
+        const closeModal = () => document.getElementById('action-modal').classList.remove('active');
+        document.getElementById('close-modal-btn').onclick = closeModal;
+        document.getElementById('modal-cancel-btn').onclick = closeModal;
+        document.addEventListener('keydown', (e) => { if(e.key === 'Escape' && document.getElementById('action-modal').classList.contains('active')) closeModal(); });
+        document.getElementById('add-school-btn').onclick = () => openActionModal();
+
+        document.getElementById('save-draft-btn').onclick = () => {
+            const formData = { timestamp: Date.now(), isDraft: true };
+            let isAnyEmpty = false;
+            fieldIds.forEach(fid => {
+                const el = document.getElementById(`edit-${fid}`);
+                const val = el ? el.value.trim() : "";
+                if (!val) isAnyEmpty = true;
+                formData[fid] = val;
+            });
+            if (isAnyEmpty) return showToast("Mohon isi semua kolom wajib.", false);
+            if (formData['npsn'] && formData['npsn'].length !== 8) { document.getElementById('edit-npsn').focus(); return showToast("NPSN harus berisi tepat 8 digit angka.", false); }
+            
+            const id = document.getElementById('edit-id').value;
+            if (id && id.startsWith('draft-')) {
+                const idx = drafts.findIndex(d => d.id === id);
+                if(idx !== -1) drafts[idx] = { ...formData, id };
+            } else {
+                formData.id = 'draft-' + Date.now();
+                drafts.unshift(formData);
+            }
+            localStorage.setItem('akta-sd-drafts', JSON.stringify(drafts));
+            showToast("Draft berhasil disimpan!");
+            closeModal();
+            refreshFilterAndRender();
+        };
+
+        async function saveProcess(shouldClose = true) {
+            const id = document.getElementById('edit-id').value;
+            const formData = { timestamp: Date.now() };
+            let isAnyEmpty = false;
+            fieldIds.forEach(fid => { const el = document.getElementById(`edit-${fid}`); const val = el ? el.value.trim() : ""; if (!val) isAnyEmpty = true; formData[fid] = val; });
+            if (isAnyEmpty) return showToast("Mohon isi semua kolom wajib.", false);
+            if (formData['npsn'] && formData['npsn'].length !== 8) { document.getElementById('edit-npsn').focus(); return showToast("NPSN harus berisi tepat 8 digit angka.", false); }
+
+            try {
+                if (isEditMode) {
+                    if (id.startsWith('draft-')) {
+                        await addDoc(collection(db, 'artifacts', appId, 'public', 'data', collectionName), formData);
+                        drafts = drafts.filter(d => d.id !== id);
+                        localStorage.setItem('akta-sd-drafts', JSON.stringify(drafts));
+                        showToast("Draft berhasil dikirim ke Database!");
+                    } else {
+                        await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', collectionName, id), formData);
+                        showToast("Perubahan telah disimpan!");
+                    }
+                } else {
+                    await addDoc(collection(db, 'artifacts', appId, 'public', 'data', collectionName), formData);
+                    showToast("Sekolah baru berhasil ditambahkan!");
+                }
+                if (shouldClose) closeModal();
+                else { fieldIds.forEach(fid => { const el = document.getElementById(`edit-${fid}`); if (el) el.value = ''; }); document.getElementById('edit-nama-sekolah').focus(); }
+            } catch (e) { showToast("Gagal menyimpan ke Cloud.", false); }
+            refreshFilterAndRender();
+        }
+
+        document.getElementById('save-main-btn').onclick = () => saveProcess(true);
+        document.getElementById('save-add-more-btn').onclick = () => saveProcess(false);
+
+        document.getElementById('duplicate-btn').onclick = async () => {
+            const id = document.getElementById('edit-id').value;
+            const formData = { timestamp: Date.now() };
+            fieldIds.forEach(fid => { const el = document.getElementById(`edit-${fid}`); if (el) formData[fid] = el.value.trim(); });
+            formData['nama-sekolah'] += " (Salinan)";
+            
+            if (id.startsWith('draft-')) {
+                formData.id = 'draft-' + Date.now();
+                formData.isDraft = true;
+                drafts.unshift(formData);
+                localStorage.setItem('akta-sd-drafts', JSON.stringify(drafts));
+                showToast("Draft diduplikat!");
+                closeModal();
+                refreshFilterAndRender();
+                return;
+            }
+
+            try {
+                await addDoc(collection(db, 'artifacts', appId, 'public', 'data', collectionName), formData);
+                showToast("Data berhasil diduplikat!");
+                closeModal();
+            } catch (e) { showToast("Gagal duplikat data.", false); }
+        };
+
+        document.getElementById('delete-btn').onclick = async () => {
+            const id = document.getElementById('edit-id').value;
+            if (confirm("Hapus data ini secara permanen?")) {
+                try {
+                    if (id.startsWith('draft-')) {
+                        drafts = drafts.filter(d => d.id !== id);
+                        localStorage.setItem('akta-sd-drafts', JSON.stringify(drafts));
+                    } else {
+                        await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', collectionName, id));
+                    }
+                    showToast("Data terhapus!");
+                    closeModal();
+                    refreshFilterAndRender();
+                } catch (e) { showToast("Gagal menghapus data.", false); }
+            }
+        };
+
+        document.getElementById('delete-selected-btn').onclick = async () => {
+            const count = selectedIds.size; if (count === 0) return;
+            if (confirm(`Apakah Anda yakin ingin menghapus ${count} data terpilih secara permanen?`)) {
+                try {
+                    showToast(`Sedang menghapus ${count} data...`);
+                    const batch = writeBatch(db);
+                    
+                    selectedIds.forEach(id => {
+                        if (id.startsWith('draft-')) {
+                            drafts = drafts.filter(d => d.id !== id);
+                        } else {
+                            const dRef = doc(db, 'artifacts', appId, 'public', 'data', collectionName, id);
+                            batch.delete(dRef);
+                        }
+                    });
+                    
+                    await batch.commit();
+                    localStorage.setItem('akta-sd-drafts', JSON.stringify(drafts));
+                    selectedIds.clear();
+                    showToast("Penghapusan data selesai.");
+                    refreshFilterAndRender();
+                } catch (e) { showToast("Gagal melakukan penghapusan.", false); }
+            }
+        };
+
+        document.getElementById('search-input').oninput = refreshFilterAndRender;
+        document.getElementById('filter-status').onchange = refreshFilterAndRender;
+
+        function refreshFilterAndRender() {
+            const q = document.getElementById('search-input').value.toLowerCase();
+            const filterStat = document.getElementById('filter-status').value;
+            
+            const allItems = [...drafts, ...allData];
+            let filtered = allItems;
+            
+            if (filterStat === 'valid') {
+                filtered = allItems.filter(item => !item.isDraft);
+            } else if (filterStat === 'draft') {
+                filtered = allItems.filter(item => item.isDraft);
+            }
+            
+            if(q) {
+                filtered = filtered.filter(item => Object.values(item).some(val => String(val).toLowerCase().includes(q)));
+            }
+            applySortAndRender(filtered);
+        }
+
+        document.getElementById('download-template-btn').onclick = () => {
+            const headers = excelColumns.map(col => col.label);
+            const ws = XLSX.utils.aoa_to_sheet([headers]); const wb = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(wb, ws, "Database"); XLSX.writeFile(wb, `Template Data Registrasi AKTA-SD ${getTimestamp()}.xlsx`); showToast("Template berhasil diunduh.");
+        };
+
+        document.getElementById('export-excel-btn').onclick = () => {
+            const expData = [...drafts, ...allData];
+            if (expData.length === 0) return showToast("Tidak ada data untuk diekspor.", false);
+            const dataToExport = selectedIds.size > 0 ? expData.filter(d => selectedIds.has(d.id)) : expData;
+            const headers = excelColumns.map(col => col.label);
+            const rows = dataToExport.map(item => excelColumns.map(col => { if (col.id === 'timestamp') return formatDisplayDate(item.timestamp); return item[col.id] || ""; }));
+            const ws = XLSX.utils.aoa_to_sheet([headers, ...rows]); const wb = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(wb, ws, "Database"); XLSX.writeFile(wb, `Ekspor Data Registrasi AKTA-SD ${getTimestamp()}.xlsx`); showToast(selectedIds.size > 0 ? "Data yang dipilih berhasil diekspor." : "Seluruh database berhasil diekspor.");
+        };
+
+        document.getElementById('import-excel-btn').onclick = () => document.getElementById('excel-file-input').click();
+        document.getElementById('excel-file-input').onchange = (e) => {
+            const file = e.target.files[0]; if (!file) return;
+            const reader = new FileReader();
+            reader.onload = async (evt) => {
+                const wb = XLSX.read(new Uint8Array(evt.target.result), {type: 'array'});
+                const data = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]]);
+                showToast(`Memulai proses impor ${data.length} baris...`);
+                for (const row of data) {
+                    const item = { timestamp: Date.now() };
+                    excelColumns.forEach(col => { if(col.id !== 'timestamp') item[col.id] = row[col.label] || row[col.id] || ""; });
+                    if (item['nama-sekolah']) await addDoc(collection(db, 'artifacts', appId, 'public', 'data', collectionName), item);
+                }
+                showToast("Proses Impor Excel Berhasil!"); e.target.value = "";
+            }; reader.readAsArrayBuffer(file);
+        };
+
+        document.getElementById('backup-btn').onclick = () => {
+            const dataStr = JSON.stringify([...drafts, ...allData].map(({id, isDraft, ...r}) => r), null, 2);
+            const blob = new Blob([dataStr], { type: 'application/json' }); const url = URL.createObjectURL(blob);
+            const a = document.createElement('a'); a.href = url; a.download = `Backup Data Registrasi AKTA-SD ${getTimestamp()}.json`; a.click(); showToast("File Backup JSON berhasil diunduh.");
+        };
+
+        document.getElementById('restore-btn').onclick = () => document.getElementById('json-file-input').click();
+        document.getElementById('json-file-input').onchange = (e) => {
+            const file = e.target.files[0]; if (!file) return;
+            const reader = new FileReader();
+            reader.onload = async (evt) => {
+                try {
+                    const data = JSON.parse(evt.target.result);
+                    showToast(`Memulai pemulihan ${data.length} data...`);
+                    for (const item of data) { if (item['nama-sekolah']) await addDoc(collection(db, 'artifacts', appId, 'public', 'data', collectionName), item); }
+                    showToast("Proses Restorasi Selesai!");
+                } catch (err) { showToast("Gagal! File JSON tidak valid.", false); } e.target.value = "";
+            }; reader.readAsText(file);
+        };
+    }
+  </script>
+</body>
+</html>
